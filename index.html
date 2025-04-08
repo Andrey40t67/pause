@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Access</title>
+    <style>
+        @font-face {
+            font-family: 'HackerFont';
+            src: url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+        }
+        
+        body {
+            background-color: #000;
+            color: #00ff00;
+            overflow: hidden;
+            cursor: none;
+        }
+        
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            background-color: #000;
+        }
+        
+        #login-screen h1 {
+            font-size: 2em;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ff00;
+            letter-spacing: 2px;
+        }
+        
+        #access-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        #access-code {
+            background-color: #000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 15px;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            width: 300px;
+            text-align: center;
+            outline: none;
+        }
+        
+        #submit-code {
+            background-color: #000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        #submit-code:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        
+        #error-message {
+            color: #ff0000;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        
+        #terminal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #000;
+            z-index: 1;
+        }
+        
+        #terminal-output {
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        #command-line {
+            display: flex;
+            align-items: center;
+        }
+        
+        #prompt {
+            margin-right: 10px;
+        }
+        
+        #command-input {
+            flex: 1;
+            background-color: transparent;
+            border: none;
+            outline: none;
+            color: #00ff00;
+            font-size: 1em;
+        }
+        
+        .cursor {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #00ff00;
+            border-radius: 50%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px 5px #00ff00;
+        }
+        
+        .typing {
+            animation: typing 0.1s infinite;
+        }
+        
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+        
+        .command {
+            margin-bottom: 10px;
+        }
+        
+        .menu-item {
+            padding: 5px 0;
+        }
+        
+        .menu-item:hover {
+            background-color: rgba(0, 255, 0, 0.2);
+        }
+        
+        .loading {
+            display: inline-block;
+            position: relative;
+        }
+        
+        .loading:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        
+        @keyframes typing {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes glitch {
+            0% { text-shadow: 0 0 5px #00ff00; }
+            25% { text-shadow: -1px 0 5px #00ff00, 1px 2px 5px #ff00ff; }
+            50% { text-shadow: 1px -1px 5px #00ffff, -1px 2px 5px #00ff00; }
+            75% { text-shadow: 1px 1px 5px #ff00ff, -1px -1px 5px #00ffff; }
+            100% { text-shadow: 0 0 5px #00ff00; }
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: '....'; }
+        }
+        
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background-color: rgba(0, 255, 0, 0.2);
+            z-index: 999;
+            animation: scanline 8s linear infinite;
+        }
+        
+        @keyframes scanline {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        
+        .noise::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAulBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAwMAAAAAAAAAAAAAAAABAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEBAQEAAAAAAAAAAAAAAAABAQEBAQEAAAAAAAAAAAABAQEAAAABAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAA/NMq0AAAAPXRSTLMAAA8PDw8PDw8PDxAQEBAQEhISEhMTExMUFBQUFRUVFhYWFxcXGBgYGRkZGhsbHBwcHR0dHh8fICEhIiMQ5z8rAAAAnklEQVRYw+3WuQ7CMBCFYYNkEzsEQsm+75C9pvd/MB8SElYacpxpGKH5u1QjfytLtjgMmtlMzT0TIKIiIcSPEV9aPCCeSyEiHhERAGPGcGNMEREAAEQ8p/YRzwAAIqI+t494DgCIiPqc/g0AACA+a1G8/SP+BPFZc0REZ/PkuTR/rqqszq4LIiJfiGiTt/mp0JHhN0X9iRCfIiJT848AvgE8fzoldF7VJQAAAABJRU5ErkJggg==");
+            opacity: 0.1;
+            animation: noise 0.5s infinite;
+        }
+        
+        @keyframes noise {
+            0%, 100% { transform: translateX(0) translateY(0); }
+            10% { transform: translateX(-1%) translateY(-1%); }
+            20% { transform: translateX(1%) translateY(1%); }
+            30% { transform: translateX(-2%) translateY(-2%); }
+            40% { transform: translateX(2%) translateY(2%); }
+            50% { transform: translateX(-1%) translateY(-1%); }
+            60% { transform: translateX(1%) translateY(1%); }
+            70% { transform: translateX(-2%) translateY(-2%); }
+            80% { transform: translateX(2%) translateY(2%); }
+            90% { transform: translateX(-1%) translateY(-1%); }
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor"></div>
+    <div class="scan-line"></div>
+    <div class="noise"></div>
+    
+    <div id="login-screen">
+        <h1 class="glitch">SECURE ACCESS TERMINAL</h1>
+        <form id="access-form">
+            <input type="password" id="access-code" placeholder="ENTER ACCESS CODE" maxlength="10">
+            <button type="submit" id="submit-code">VERIFY</button>
+        </form>
+        <div id="error-message">ACCESS DENIED: INVALID CODE</div>
+    </div>
+    
+    <div id="terminal">
+        <div id="terminal-output"></div>
+        <div id="command-line">
+            <span id="prompt">root@system:~#</span>
+            <input type="text" id="command-input" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+    
+    <script>
+        // The real access code is hidden in JavaScript to prevent it from being visible in HTML source
+        // The real code is calculated by a function to make it harder to find
+        function calculateAccessCode() {
+            // This is a way to hide the code "2914" from simple inspection
+            let code = "";
+            code += String.fromCharCode(50 + 0); // "2"
+            code += String.fromCharCode(57 + 0); // "9"
+            code += String.fromCharCode(49 + 0); // "1"
+            code += String.fromCharCode(52 + 0); // "4"
+            return code;
+        }
+        
+        const realAccessCode = calculateAccessCode();
+        
+        // Custom cursor
+        document.addEventListener('mousemove', (e) => {
+            const cursor = document.querySelector('.cursor');
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+        });
+        
+        // Access code validation
+        document.getElementById('access-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const accessCode = document.getElementById('access-code').value;
+            
+            if (accessCode === realAccessCode) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('terminal').style.display = 'block';
+                initTerminal();
+            } else {
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('access-code').value = '';
+                setTimeout(() => {
+                    document.getElementById('error-message').style.display = 'none';
+                }, 3000);
+            }
+        });
+        
+        // Terminal initialization
+        function initTerminal() {
+            const terminal = document.getElementById('terminal-output');
+            const commandInput = document.getElementById('command-input');
+            
+            // Boot sequence
+            terminal.innerHTML += "INITIALIZING SYSTEM...\n";
+            setTimeout(() => { terminal.innerHTML += "ESTABLISHING SECURE CONNECTION"; }, 500);
+            
+            let dots = 0;
+            const loadingInterval = setInterval(() => {
+                terminal.innerHTML = terminal.innerHTML.replace(/\.+$/, '') + '.'.repeat(dots % 4 + 1);
+                dots++;
+                if (dots > 15) {
+                    clearInterval(loadingInterval);
+                    terminal.innerHTML += "\nCONNECTION ESTABLISHED\n";
+                    setTimeout(() => {
+                        terminal.innerHTML += "LOADING KERNEL MODULES";
+                    }, 300);
+                    
+                    let moduleDots = 0;
+                    const moduleInterval = setInterval(() => {
+                        terminal.innerHTML = terminal.innerHTML.replace(/\.+$/, '') + '.'.repeat(moduleDots % 4 + 1);
+                        moduleDots++;
+                        if (moduleDots >10) {
+                            clearInterval(moduleInterval);
+                            terminal.innerHTML += "\nSYSTEM READY\n\n";
+                            terminal.innerHTML += "WELCOME TO ADVANCED CYBER OPERATIONS TERMINAL v3.1.4\n";
+                            terminal.innerHTML += "TYPE '/menu' TO DISPLAY AVAILABLE COMMANDS\n\n";
+                            
+                            commandInput.focus();
+                        }
+                    }, 200);
+                }
+            }, 200);
+            
+            // Handle command input
+            commandInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const command = commandInput.value.trim();
+                    processCommand(command);
+                    commandInput.value = '';
+                }
+            });
+            
+            // Auto-focus command input when clicking anywhere in the terminal
+            document.getElementById('terminal').addEventListener('click', function() {
+                commandInput.focus();
+            });
+        }
+        
+        // Process terminal commands
+        function processCommand(command) {
+            const terminal = document.getElementById('terminal-output');
+            
+            // Add command to terminal output
+            terminal.innerHTML += `<div class="command">\n<span id="prompt">root@system:~#</span> ${command}</div>`;
+            
+            // Process the command
+            if (command.toLowerCase() === '/menu') {
+                displayMenu();
+            } else if (command.toLowerCase() === 'clear' || command.toLowerCase() === 'cls') {
+                terminal.innerHTML = '';
+            } else if (command.toLowerCase() === 'help') {
+                terminal.innerHTML += "TYPE '/menu' TO DISPLAY AVAILABLE COMMANDS\n\n";
+            } else if (command.toLowerCase().startsWith('/hack')) {
+                processHackCommand(command);
+            } else if (command.toLowerCase().startsWith('/scan')) {
+                processScanCommand(command);
+            } else if (command.toLowerCase().startsWith('/decrypt')) {
+                processDecryptCommand(command);
+            } else if (command.toLowerCase().startsWith('/access')) {
+                processAccessCommand(command);
+            } else if (command.toLowerCase() === '/exit' || command.toLowerCase() === '/logout') {
+                terminal.innerHTML += "LOGGING OUT...\n";
+                setTimeout(() => {
+                    document.getElementById('terminal').style.display = 'none';
+                    document.getElementById('login-screen').style.display = 'flex';
+                    document.getElementById('access-code').value = '';
+                }, 1500);
+            } else if (command.trim() === '') {
+                // Do nothing for empty command
+            } else {
+                terminal.innerHTML += `COMMAND NOT RECOGNIZED: ${command}\n`;
+                terminal.innerHTML += "TYPE '/menu' FOR AVAILABLE COMMANDS\n\n";
+            }
+            
+            // Scroll to bottom of terminal
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // Display the menu of commands
+        function displayMenu() {
+            const terminal = document.getElementById('terminal-output');
+            
+            terminal.innerHTML += `
+<div class="menu">
+==============================================
+        ADVANCED CYBER OPERATIONS MENU
+==============================================
+
+[INTRUSION TOOLS]
+/hack wifi                - Crack nearby WiFi networks
+/hack password            - Extract password hashes
+/hack database            - Infiltrate database systems
+/hack mainframe           - Access mainframe interfaces
+/hack tesla               - Take control of Tesla vehicles
+/hack satellite           - Hijack satellite communications
+/hack crypto              - Break cryptocurrency wallets
+/hack server              - Penetrate server infrastructure
+/hack router              - Exploit router vulnerabilities
+/hack atm                 - Access ATM control systems
+/hack drone               - Take control of surveillance drones
+/hack camera              - Access security camera feeds
+/hack phone               - Extract mobile device data
+/hack browser             - Inject browser exploits
+/hack email               - Access email accounts
+
+[SCANNING TOOLS]
+/scan network             - Identify network endpoints
+/scan vulnerability       - Find system vulnerabilities
+/scan ports               - Search for open ports
+/scan devices             - Detect connected devices
+/scan traffic             - Monitor network traffic
+/scan firewall            - Analyze firewall configurations
+/scan endpoints           - Identify network endpoints
+/scan bluetooth           - Detect bluetooth devices
+/scan wireless            - Map wireless networks
+/scan protocols           - Identify network protocols
+
+[DECRYPTION TOOLS]
+/decrypt md5              - Crack MD5 hash encryption
+/decrypt sha              - Break SHA encryption
+/decrypt rsa              - Decrypt RSA secured messages
+/decrypt aes              - Bypass AES encryption
+/decrypt pgp              - Break PGP encryption
+/decrypt ssl              - Intercept SSL communications
+/decrypt voip             - Decrypt voice communications
+/decrypt blockchain       - Analyze blockchain transactions
+/decrypt vpn              - Penetrate VPN connections
+/decrypt steganography    - Extract hidden data from files
+
+[ACCESS TOOLS]
+/access cctv              - Tap into CCTV networks
+/access database          - Breach database servers
+/access government        - Access government systems
+/access financial         - Enter financial networks
+/access medical           - Breach medical record systems
+/access social            - Infiltrate social media accounts
+/access corporate         - Access corporate networks
+/access cloud             - Break into cloud storage
+/access transportation    - Control transportation systems
+/access military          - Infiltrate military networks
+/access satellite         - Connect to satellite systems
+/access power             - Access power grid controls
+/access telecom           - Breach telecom infrastructure
+/access iot               - Control Internet of Things devices
+
+[INFORMATION GATHERING]
+/find person              - Locate a person's digital footprint
+/find company             - Gather intelligence on organizations
+/find vulnerability       - Discover system weaknesses
+/find credentials         - Search for exposed credentials
+/find documents           - Locate sensitive documents
+/find server              - Discover hidden servers
+/find device              - Locate specific networked devices
+/find darkweb             - Search darkweb for information
+/find bitcoin             - Trace bitcoin transactions
+/find ip                  - Geolocate IP addresses
+
+[ATTACK VECTORS]
+/attack phishing          - Generate phishing campaigns
+/attack ddos              - Launch DDoS attacks
+/attack malware           - Deploy malware payloads
+/attack ransomware        - Create ransomware instances
+/attack mitm              - Execute man-in-the-middle attacks
+/attack bruteforce        - Run bruteforce password cracking
+/attack sql               - Perform SQL injection attacks
+/attack xss               - Inject cross-site scripting
+/attack csrf              - Launch cross-site request forgery
+/attack zero-day          - Deploy zero-day exploits
+
+[DEFENSIVE TOOLS]
+/defense firewall         - Configure advanced firewall
+/defense encrypt          - Encrypt sensitive data
+/defense scan             - Scan for malware and backdoors
+/defense monitor          - Monitor system activities
+/defense sandbox          - Create isolated environment
+/defense vpn              - Establish secure VPN connection
+/defense backup           - Perform secure data backup
+/defense antivirus        - Deploy advanced antivirus protocols
+/defense ids              - Configure intrusion detection system
+/defense honeypot         - Set up honeypot traps
+
+[UTILITIES]
+/proxy chain              - Configure anonymous proxy chains
+/spoof mac                - Change hardware MAC address
+/spoof ip                 - Mask original IP address
+/trace route              - Identify network pathways
+/bounce signal            - Redirect connection through nodes
+/encode base64            - Encode data to Base64
+/decode base64            - Decode Base64 data
+/encrypt file             - Encrypt file with military-grade encryption
+/decrypt file             - Decrypt encrypted files
+/wipe logs                - Erase system activity logs
+/analyze packet           - Perform deep packet inspection
+/inject payload           - Insert code into remote systems
+/obfuscate code           - Make code unreadable to analysis
+/secure tunnel            - Create secure communication tunnel
+/bypass captcha           - Automatically solve CAPTCHA challenges
+
+[SYSTEM COMMANDS]
+clear                     - Clear terminal screen
+/help                     - Display basic help
+/exit                     - Exit terminal session
+/logout                   - Log out from current session
+
+==============================================
+WARNING: USE THESE TOOLS RESPONSIBLY AND LEGALLY
+==============================================
+</div>\n\n`;
+        }
+        
+        // Process Hack commands
+        function processHackCommand(command) {
+            const terminal = document.getElementById('terminal-output');
+            const target = command.split(' ').slice(1).join(' ');
+            
+            terminal.innerHTML += `<div class="loading">INITIALIZING HACK SEQUENCE FOR ${target.toUpperCase()}</div>\n`;
+            
+            setTimeout(() => {
+                terminal.innerHTML = terminal.innerHTML.replace(/<div class="loading">.*<\/div>/, '');
+                terminal.innerHTML += `ESTABLISHING SECURE CONNECTION TO ${target.toUpperCase()} SYSTEMS`;
+                
+                let dots = 0;
+                const loadingInterval = setInterval(() => {
+                    terminal.innerHTML = terminal.innerHTML.replace(/\.+$/, '') + '.'.repeat(dots % 4 + 1);
+                    dots++;
+                    if (dots > 10) {
+                        clearInterval(loadingInterval);
+                        simulateHacking(target);
+                    }
+                }, 200);
+            }, 1000);
+        }
+        
+        // Process Scan commands
+        function processScanCommand(command) {
+            const terminal = document.getElementById('terminal-output');
+            const target = command.split(' ').slice(1).join(' ');
+            
+            terminal.innerHTML += `<div class="loading">INITIALIZING SCAN FOR ${target.toUpperCase()}</div>\n`;
+            
+            setTimeout(() => {
+                terminal.innerHTML = terminal.innerHTML.replace(/<div class="loading">.*<\/div>/, '');
+                terminal.innerHTML += `SCANNING ${target.toUpperCase()}`;
+                
+                let progress = 0;
+                const scanInterval = setInterval(() => {
+                    progress += Math.floor(Math.random() * 10) + 1;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(scanInterval);
+                        simulateScanning(target);
+                    }
+                    terminal.innerHTML = terminal.innerHTML.replace(/SCANNING.*\d+%/, `SCANNING ${target.toUpperCase()}: ${progress}%`);
+                }, 300);
+            }, 1000);
+        }
+        
+        // Process Decrypt commands
+        function processDecryptCommand(command) {
+            const terminal = document.getElementById('terminal-output');
+            const target = command.split(' ').slice(1).join(' ');
+            
+            terminal.innerHTML += `<div class="loading">INITIALIZING DECRYPTION OF ${target.toUpperCase()} ALGORITHM</div>\n`;
+            
+            setTimeout(() => {
+                terminal.innerHTML = terminal.innerHTML.replace(/<div class="loading">.*<\/div>/, '');
+                terminal.innerHTML += `ANALYZING ${target.toUpperCase()} ENCRYPTION PATTERNS`;
+                
+                let progress = 0;
+                const decryptInterval = setInterval(() => {
+                    progress += Math.floor(Math.random() * 5) + 1;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(decryptInterval);
+                        simulateDecryption(target);
+                    }
+                    terminal.innerHTML = terminal.innerHTML.replace(/ANALYZING.*\d+%/, `ANALYZING ${target.toUpperCase()} ENCRYPTION PATTERNS: ${progress}%`);
+                }, 400);
+            }, 1000);
+        }
+        
+        // Process Access commands
+        function processAccessCommand(command) {
+            const terminal = document.getElementById('terminal-output');
+            const target = command.split(' ').slice(1).join(' ');
+            
+            terminal.innerHTML += `<div class="loading">ESTABLISHING CONNECTION TO ${target.toUpperCase()} SYSTEMS</div>\n`;
+            
+            setTimeout(() => {
+                terminal.innerHTML = terminal.innerHTML.replace(/<div class="loading">.*<\/div>/, '');
+                terminal.innerHTML += `BYPASSING ${target.toUpperCase()} SECURITY PROTOCOLS`;
+                
+                let progress = 0;
+                const accessInterval = setInterval(() => {
+                    progress += Math.floor(Math.random() * 7) + 1;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(accessInterval);
+                        simulateAccess(target);
+                    }
+                    terminal.innerHTML = terminal.innerHTML.replace(/BYPASSING.*\d+%/, `BYPASSING ${target.toUpperCase()} SECURITY PROTOCOLS: ${progress}%`);
+                }, 350);
+            }, 1000);
+        }
+        
+        // Simulate hacking progress and results
+        function simulateHacking(target) {
+            const terminal = document.getElementById('terminal-output');
+            
+            const lines = [
+                "\nLOCATING TARGET SYSTEMS...",
+                "IDENTIFYING VULNERABILITIES...",
+                "EXPLOITING SECURITY WEAKNESSES...",
+                "BYPASSING FIREWALL...",
+                "INJECTING PAYLOAD...",
+                "ESTABLISHING BACKDOOR ACCESS...",
+                "ESCALATING PRIVILEGES...",
+                "EXTRACTING SENSITIVE DATA..."
+            ];
+            
+            let lineIndex = 0;
+            
+            const lineInterval = setInterval(() => {
+                terminal.innerHTML += `\n${lines[lineIndex]}`;
+                lineIndex++;
+                
+                terminal.scrollTop = terminal.scrollHeight;
+                
+                if (lineIndex >= lines.length) {
+                    clearInterval(lineInterval);
+                    
+                    setTimeout(() => {
+                        // Display "success" message
+                        terminal.innerHTML += `\n\n[SUCCESS] ${target.toUpperCase()} SYSTEM COMPROMISED\n`;
+                        
+                        // Generate fake but convincing data based on the target
+                        let result = "";
+                        
+                        if (target.toLowerCase() === "wifi") {
+                            result = generateWifiResults();
+                        } else if (target.toLowerCase() === "password") {
+                            result = generatePasswordResults();
+                        } else if (target.toLowerCase() === "database") {
+                            result = generateDatabaseResults();
+                        } else if (target.toLowerCase() === "tesla") {
+                            result = generateTeslaResults();
+                        } else if (target.toLowerCase() === "satellite") {
+                            result = generateSatelliteResults();
+                        } else if (target.toLowerCase() === "crypto") {
+                            result = generateCryptoResults();
+                        } else if (target.toLowerCase() === "mainframe") {
+                            result = generateMainframeResults();
+                        } else {
+                            // Generic result for other targets
+                            result = `EXTRACTED DATA FROM ${target.toUpperCase()}:\n`;
+                            result += generateGenericHackResults();
+                        }
+                        
+                        terminal.innerHTML += result;
+                        terminal.innerHTML += "\n\nHACK COMPLETED. COVERING TRACKS...\n";
+                        
+                        setTimeout(() => {
+                            terminal.innerHTML += "ALL TRACES REMOVED. CONNECTION TERMINATED.\n\n";
+                            terminal.scrollTop = terminal.scrollHeight;
+                        }, 1500);
+                    }, 1000);
+                }
+            }, 700);
+        }
+        
+        // Simulate scanning progress and results
+        function simulateScanning(target) {
+            const terminal = document.getElementById('terminal-output');
+            
+            terminal.innerHTML += "\n\n[SCAN COMPLETE]\n";
+            
+            let result = "";
+            
+            if (target.toLowerCase() === "network") {
+                result = generateNetworkScanResults();
+            } else if (target.toLowerCase() === "vulnerability") {
+                result = generateVulnerabilityScanResults();
+            } else if (target.toLowerCase() === "ports") {
+                result = generatePortScanResults();
+            } else if (target.toLowerCase() === "devices") {
+                result = generateDeviceScanResults();
+            } else if (target.toLowerCase() === "traffic") {
+                result = generateTrafficScanResults();
+            } else {
+                // Generic result for other targets
+                result = `SCAN RESULTS FOR ${target.toUpperCase()}:\n`;
+                result += generateGenericScanResults();
+            }
+            
+            terminal.innerHTML += result;
+            terminal.innerHTML += "\n\nSCAN COMPLETED. REPORT GENERATED.\n\n";
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // Simulate decryption progress and results
+        function simulateDecryption(target) {
+            const terminal = document.getElementById('terminal-output');
+            
+            terminal.innerHTML += "\n\n[DECRYPTION COMPLETE]\n";
+            
+            let result = "";
+            
+            if (target.toLowerCase() === "md5") {
+                result = generateMd5DecryptResults();
+            } else if (target.toLowerCase() === "sha") {
+                result = generateShaDecryptResults();
+            } else if (target.toLowerCase() === "rsa") {
+                result = generateRsaDecryptResults();
+            } else if (target.toLowerCase() === "aes") {
+                result = generateAesDecryptResults();
+            } else {
+                // Generic result for other targets
+                result = `DECRYPTION RESULTS FOR ${target.toUpperCase()}:\n`;
+                result += generateGenericDecryptResults();
+            }
+            
+            terminal.innerHTML += result;
+            terminal.innerHTML += "\n\nDECRYPTION COMPLETED. DATA EXTRACTED.\n\n";
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // Simulate access progress and results
+        function simulateAccess(target) {
+            const terminal = document.getElementById('terminal-output');
+            
+            terminal.innerHTML += "\n\n[ACCESS GRANTED]\n";
+            
+            let result = "";
+            
+            if (target.toLowerCase() === "cctv") {
+                result = generateCctvAccessResults();
+            } else if (target.toLowerCase() === "database") {
+                result = generateDatabaseAccessResults();
+            } else if (target.toLowerCase() === "government") {
+                result = generateGovernmentAccessResults();
+            } else if (target.toLowerCase() === "financial") {
+                result = generateFinancialAccessResults();
+            } else {
+                // Generic result for other targets
+                result = `ACCESS RESULTS FOR ${target.toUpperCase()}:\n`;
+                result += generateGenericAccessResults();
+            }
+            
+            terminal.innerHTML += result;
+            terminal.innerHTML += "\n\nACCESS COMPLETED. CONNECTION ESTABLISHED.\n\n";
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // Generate random hex string of specified length
+        function randomHex(length) {
+            const chars = '0123456789ABCDEF';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+        
+        // Generate random IP address
+        function randomIP() {
+            return `${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+        }
+        
+                // Generate random MAC address
+        function randomMAC() {
+            return `${randomHex(2)}:${randomHex(2)}:${randomHex(2)}:${randomHex(2)}:${randomHex(2)}:${randomHex(2)}`;
+        }
+        
+        // Generate random port number
+        function randomPort() {
+            return Math.floor(Math.random() * 65535) + 1;
+        }
+        
+        // Generate fake WiFi hacking results
+        function generateWifiResults() {
+            let result = "DISCOVERED WIFI NETWORKS:\n\n";
+            
+            const networks = [
+                {name: "HOME-2G", security: "WPA2", password: "famil3y2022!", signal: "92%", mac: randomMAC()},
+                {name: "NETGEAR_5G", security: "WPA2", password: "autumn2021", signal: "78%", mac: randomMAC()},
+                {name: "ASUS_ROUTER", security: "WPA2", password: "Admin@1234", signal: "65%", mac: randomMAC()},
+                {name: "TP-Link_384A", security: "WPA3", password: "TP45link!92", signal: "81%", mac: randomMAC()},
+                {name: "DIRECT-roku-743", security: "WPA2", password: "streamTV2023", signal: "39%", mac: randomMAC()},
+                {name: "ATT-WIFI-5824", security: "WPA2", password: "att93827465", signal: "74%", mac: randomMAC()},
+                {name: "Xfinity_2.4", security: "WPA2", password: "summer2022!", signal: "87%", mac: randomMAC()},
+            ];
+            
+            for (const network of networks) {
+                result += `SSID: ${network.name}\n`;
+                result += `SECURITY: ${network.security}\n`;
+                result += `PASSWORD: ${network.password}\n`;
+                result += `SIGNAL STRENGTH: ${network.signal}\n`;
+                result += `MAC: ${network.mac}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate fake password hacking results
+        function generatePasswordResults() {
+            let result = "EXTRACTED PASSWORD HASHES:\n\n";
+            
+            const passwords = [
+                {user: "admin", hash: randomHex(32), plain: "admin123!"},
+                {user: "john.smith", hash: randomHex(32), plain: "js1982summer"},
+                {user: "sarah.connor", hash: randomHex(32), plain: "jud6m3ntd4y"},
+                {user: "mark.johnson", hash: randomHex(32), plain: "P@ssw0rd2023"},
+                {user: "lisa.wong", hash: randomHex(32), plain: "family3kids!"},
+                {user: "david.miller", hash: randomHex(32), plain: "redcars54!"},
+                {user: "system", hash: randomHex(32), plain: "sysadmin2023!"},
+            ];
+            
+            for (const password of passwords) {
+                result += `USER: ${password.user}\n`;
+                result += `HASH: ${password.hash}\n`;
+                result += `DECRYPTED: ${password.plain}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate fake database hacking results
+        function generateDatabaseResults() {
+            let result = "DATABASE STRUCTURE:\n\n";
+            
+            result += "Tables discovered: 16\n";
+            result += "Records accessible: 142,583\n\n";
+            
+            result += "TABLE: users\n";
+            result += "COLUMNS: id, username, email, password_hash, created_at, last_login\n";
+            result += "RECORDS: 8,472\n\n";
+            
+            result += "TABLE: transactions\n";
+            result += "COLUMNS: id, user_id, amount, description, timestamp, status\n";
+            result += "RECORDS: 124,892\n\n";
+            
+            result += "TABLE: products\n";
+            result += "COLUMNS: id, name, description, price, inventory_count, category_id\n";
+            result += "RECORDS: 1,256\n\n";
+            
+            result += "SAMPLE DATA EXTRACT:\n\n";
+            result += "FROM users:\n";
+            result += "id: 1042, username: 'jsmith', email: 'john.smith@example.com', password_hash: 'b4cc344d25a2efe540adbf2678e2304c', created_at: '2022-01-04 08:12:33'\n";
+            result += "id: 1043, username: 'mwilliams', email: 'mark.williams@example.com', password_hash: 'a7c8fe92e95edf85410a443957cea18f', created_at: '2022-01-04 14:27:18'\n";
+            
+            return result;
+        }
+        
+        // Generate fake Tesla hacking results
+        function generateTeslaResults() {
+            let result = "TESLA VEHICLE ACCESS:\n\n";
+            
+            result += "MODEL: Tesla Model 3\n";
+            result += "VIN: 5YJ3E1EA4KF346782\n";
+            result += "OWNER: James Wilson\n";
+            result += "CURRENT LOCATION: 34.0522° N, 118.2437° W\n";
+            result += "BATTERY: 78%\n";
+            result += "LOCK STATUS: Unlocked\n";
+            result += "CLIMATE: ON (72°F)\n\n";
+            
+            result += "CONTROL OPTIONS:\n";
+            result += "- REMOTE START\n";
+            result += "- LOCK/UNLOCK\n";
+            result += "- HONK HORN\n";
+            result += "- FLASH LIGHTS\n";
+            result += "- SET CLIMATE\n";
+            result += "- OPEN TRUNK\n\n";
+            
+            result += "VEHICLE DATA:\n";
+            result += "Last Trip: 12.4 miles\n";
+            result += "Firmware: 2023.12.1\n";
+            result += "Sentry Mode: Enabled\n";
+            result += "Smart Summon: Available\n";
+            
+            return result;
+        }
+        
+        // Generate fake satellite hacking results
+        function generateSatelliteResults() {
+            let result = "SATELLITE SYSTEM ACCESS:\n\n";
+            
+            result += "SATELLITE ID: NOAA-18\n";
+            result += "ORBIT: 854 km, Sun-synchronous\n";
+            result += "POSITION: 42.3601° N, 71.0589° W\n";
+            result += "VELOCITY: 7.5 km/s\n";
+            result += "STATUS: Operational\n";
+            result += "UPLINK FREQUENCY: 2025-2110 MHz\n";
+            result += "DOWNLINK FREQUENCY: 2200-2290 MHz\n\n";
+            
+            result += "COMMUNICATION CHANNELS:\n";
+            result += "- PRIMARY: Encrypted (AES-256)\n";
+            result += "- SECONDARY: Partially Encrypted (TDRSS)\n";
+            result += "- TELEMETRY: Unencrypted\n\n";
+            
+            result += "DATA STREAMS:\n";
+            result += "- Weather imaging (2.5 GB/day)\n";
+            result += "- Atmospheric readings (1.8 GB/day)\n";
+            result += "- Position telemetry (0.4 GB/day)\n";
+            result += "- System diagnostics (0.2 GB/day)\n";
+            
+            return result;
+        }
+        
+        // Generate fake crypto wallet hacking results
+        function generateCryptoResults() {
+            let result = "CRYPTOCURRENCY WALLET ACCESS:\n\n";
+            
+            result += "WALLET TYPE: Bitcoin (BTC)\n";
+            result += "ADDRESS: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa\n";
+            result += "PRIVATE KEY: 5KLmNruL6L5m3jf26xYy5bfKrt6bDTQmLAQiJbnU3TRk44tj8kT\n";
+            result += "BALANCE: 2.34 BTC ($89,437.28 USD)\n\n";
+            
+            result += "TRANSACTION HISTORY:\n";
+            result += "- 2023-04-12: +0.5 BTC from 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy\n";
+            result += "- 2023-03-27: -0.2 BTC to bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq\n";
+            result += "- 2023-02-14: +0.75 BTC from 1Fq4FfzJDNGT9gR6AvvFX39s7FrXBCXC4X\n\n";
+            
+            result += "ADDITIONAL WALLETS DISCOVERED:\n";
+            result += "- Ethereum (ETH): 0x742d35Cc6634C0532925a3b844Bc454e4438f44e (1.45 ETH)\n";
+            result += "- Litecoin (LTC): LUHpEn2YUVxYp2cAEgTdcEbn8yxMJ2Pzxi (12.5 LTC)\n";
+            
+            return result;
+        }
+        
+        // Generate fake mainframe hacking results
+        function generateMainframeResults() {
+            let result = "MAINFRAME ACCESS GRANTED:\n\n";
+            
+            result += "SYSTEM: IBM z15 Mainframe\n";
+            result += "OS: z/OS 2.5\n";
+            result += "UPTIME: 347 days, 8 hours\n";
+            result += "CPU USAGE: 67%\n";
+            result += "MEMORY: 98.2 GB / 256 GB\n";
+            result += "STORAGE: 42.7 TB / 80 TB\n\n";
+            
+            result += "ACTIVE JOBS:\n";
+            result += "- PAYROLL.JCL (Running)\n";
+            result += "- ACCTPROCESS.JCL (Running)\n";
+            result += "- INVENTRY.JCL (Running)\n";
+            result += "- BACKUP.JCL (Scheduled)\n\n";
+            
+            result += "ACTIVE USERS: 347\n";
+            result += "DATABASES: DB2, IMS, VSAM\n";
+            result += "APPLICATIONS: CICS, IMS TM, WebSphere\n\n";
+            
+            result += "SENSITIVE DATA LOCATIONS:\n";
+            result += "- /SYS1/FINANCIAL/QUARTERLY\n";
+            result += "- /APP/CUSTOMER/PROFILES\n";
+            result += "- /DATA/HR/EMPLOYEES\n";
+            
+            return result;
+        }
+        
+        // Generate generic hack results for other targets
+        function generateGenericHackResults() {
+            let result = "";
+            
+            result += "SYSTEM INFORMATION:\n";
+            result += `IP ADDRESS: ${randomIP()}\n`;
+            result += `MAC ADDRESS: ${randomMAC()}\n`;
+            result += "OS: Linux 5.15.0-76-generic\n";
+            result += "HOSTNAME: srv-prod-04\n\n";
+            
+            result += "OPEN PORTS:\n";
+            result += `${randomPort()} (SSH)\n`;
+            result += `${randomPort()} (HTTP)\n`;
+            result += `${randomPort()} (HTTPS)\n`;
+            result += `${randomPort()} (FTP)\n`;
+            result += `${randomPort()} (UNKNOWN)\n\n`;
+            
+            result += "USERS DISCOVERED:\n";
+            result += "admin (UID: 0)\n";
+            result += "john.doe (UID: 1001)\n";
+            result += "service.acct (UID: 999)\n";
+            result += "www-data (UID: 33)\n\n";
+            
+            result += "FILES OF INTEREST:\n";
+            result += "/etc/passwd\n";
+            result += "/var/www/html/config.php\n";
+            result += "/home/john.doe/.ssh/id_rsa\n";
+            result += "/opt/application/database.yml\n";
+            
+            return result;
+        }
+        
+        // Generate network scan results
+        function generateNetworkScanResults() {
+            let result = "NETWORK SCAN RESULTS:\n\n";
+            
+            result += "TOTAL DEVICES FOUND: 12\n\n";
+            
+            const devices = [
+                {ip: randomIP(), mac: randomMAC(), name: "Router", vendor: "Cisco", ports: [80, 443, 22, 23]},
+                {ip: randomIP(), mac: randomMAC(), name: "Server-01", vendor: "Dell", ports: [80, 443, 22, 3306]},
+                {ip: randomIP(), mac: randomMAC(), name: "Workstation-1", vendor: "HP", ports: [445, 139]},
+                {ip: randomIP(), mac: randomMAC(), name: "Printer", vendor: "HP", ports: [631, 9100]},
+                {ip: randomIP(), mac: randomMAC(), name: "NAS", vendor: "Synology", ports: [80, 443, 22, 111]},
+                {ip: randomIP(), mac: randomMAC(), name: "Smart TV", vendor: "Samsung", ports: [8008, 8009]},
+                {ip: randomIP(), mac: randomMAC(), name: "IP Camera", vendor: "Hikvision", ports: [80, 554]},
+                {ip: randomIP(), mac: randomMAC(), name: "Mobile-1", vendor: "Apple", ports: [62078]},
+            ];
+            
+            for (const device of devices) {
+                result += `DEVICE: ${device.name}\n`;
+                result += `IP: ${device.ip}\n`;
+                result += `MAC: ${device.mac}\n`;
+                result += `VENDOR: ${device.vendor}\n`;
+                result += `OPEN PORTS: ${device.ports.join(", ")}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate vulnerability scan results
+        function generateVulnerabilityScanResults() {
+            let result = "VULNERABILITY SCAN RESULTS:\n\n";
+            
+            result += "TOTAL VULNERABILITIES FOUND: 23\n\n";
+            
+            const vulnerabilities = [
+                {cve: "CVE-2021-44228", name: "Log4Shell", severity: "CRITICAL", description: "Remote code execution in Log4j", path: "/opt/tomcat/webapps/"},
+                {cve: "CVE-2023-23397", name: "Microsoft Outlook Elevation of Privilege", severity: "HIGH", description: "Allows theft of Net-NTLMv2 hash"},
+                {cve: "CVE-2022-22965", name: "Spring4Shell", severity: "CRITICAL", description: "RCE in Spring Framework", path: "/var/www/app/"},
+                {cve: "CVE-2021-3129", name: "Laravel Debug Mode RCE", severity: "HIGH", description: "Remote code execution via debug mode", path: "/var/www/html/"},
+                {cve: "CVE-2022-0847", name: "Dirty Pipe", severity: "HIGH", description: "Local privilege escalation in Linux kernel", path: "Kernel 5.8-5.16"},
+                {cve: "CVE-2021-41773", name: "Apache Path Traversal", severity: "MEDIUM", description: "Path traversal in Apache HTTP Server", path: "/etc/apache2/"},
+            ];
+            
+            for (const vuln of vulnerabilities) {
+                result += `CVE: ${vuln.cve}\n`;
+                result += `NAME: ${vuln.name}\n`;
+                result += `SEVERITY: ${vuln.severity}\n`;
+                result += `DESCRIPTION: ${vuln.description}\n`;
+                result += `AFFECTED COMPONENT: ${vuln.path}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate port scan results
+        function generatePortScanResults() {
+            let result = "PORT SCAN RESULTS:\n\n";
+            
+            result += `TARGET: ${randomIP()}\n\n`;
+            result += "OPEN PORTS:\n\n";
+            
+            const ports = [
+                {port: 22, service: "SSH", version: "OpenSSH 8.9p1", state: "OPEN"},
+                {port: 80, service: "HTTP", version: "nginx 1.23.1", state: "OPEN"},
+                {port: 443, service: "HTTPS", version: "nginx 1.23.1", state: "OPEN"},
+                {port: 3306, service: "MySQL", version: "MySQL 8.0.30", state: "OPEN"},
+                {port: 8080, service: "HTTP-Proxy", version: "Apache Tomcat 9.0.65", state: "OPEN"},
+                {port: 21, service: "FTP", version: "vsftpd 3.0.3", state: "FILTERED"},
+                {port: 25, service: "SMTP", version: "Postfix", state: "FILTERED"},
+                {port: 53, service: "DNS", version: "BIND 9.18.7", state: "OPEN"},
+            ];
+            
+            for (const port of ports) {
+                result += `PORT: ${port.port}\n`;
+                result += `SERVICE: ${port.service}\n`;
+                result += `VERSION: ${port.version}\n`;
+                result += `STATE: ${port.state}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate device scan results
+        function generateDeviceScanResults() {
+            let result = "DEVICE SCAN RESULTS:\n\n";
+            
+            result += "TOTAL DEVICES FOUND: 15\n\n";
+            
+            const devices = [
+                {type: "Router", model: "Cisco RV340", firmware: "1.0.03.17", vuln: "Multiple known CVEs"},
+                {type: "Switch", model: "TP-Link TL-SG108E", firmware: "1.0.2", vuln: "None detected"},
+                {type: "Access Point", model: "Ubiquiti UniFi AP-AC-Pro", firmware: "6.0.19", vuln: "CVE-2021-44228"},
+                {type: "Security Camera", model: "Hikvision DS-2CD2142FWD-I", firmware: "V5.5.81", vuln: "Multiple backdoors"},
+                {type: "Smart TV", model: "Samsung QN90A", firmware: "T-KDEDEUC-2110.3", vuln: "Outdated WebKit"},
+                {type: "Network Printer", model: "HP LaserJet Pro MFP M428fdw", firmware: "20210312", vuln: "Outdated SNMP"},
+                {type: "IoT Hub", model: "Samsung SmartThings Hub", firmware: "0.42.3", vuln: "Authentication bypass"},
+            ];
+            
+            for (const device of devices) {
+                result += `TYPE: ${device.type}\n`;
+                result += `MODEL: ${device.model}\n`;
+                result += `FIRMWARE: ${device.firmware}\n`;
+                result += `VULNERABILITIES: ${device.vuln}\n`;
+                result += `IP: ${randomIP()}\n`;
+                result += `MAC: ${randomMAC()}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate traffic scan results
+        function generateTrafficScanResults() {
+            let result = "TRAFFIC ANALYSIS RESULTS:\n\n";
+            
+            result += "MONITORING TIME: 00:05:36\n";
+            result += "PACKETS ANALYZED: 45,782\n";
+            result += "DATA VOLUME: 268.4 MB\n\n";
+            
+            result += "PROTOCOL DISTRIBUTION:\n";
+            result += "- HTTP/S: 68.2%\n";
+            result += "- DNS: 12.3%\n";
+            result += "- SSH: 8.7%\n";
+            result += "- SMB: 5.4%\n";
+            result += "- SNMP: 2.8%\n";
+            result += "- OTHER: 2.6%\n\n";
+            
+            result += "SUSPICIOUS TRAFFIC DETECTED:\n";
+            result += `1. Excessive DNS queries from ${randomIP()} to ${randomIP()}\n`;
+            result += `2. Unencrypted authentication from ${randomIP()} to ${randomIP()}\n`;
+            result += `3. Potential data exfiltration from ${randomIP()} (4.7 MB in 10 seconds)\n\n`;
+            
+            result += "TOP CONNECTIONS:\n";
+            result += `1. ${randomIP()} -> ${randomIP()} (67.3 MB)\n`;
+            result += `2. ${randomIP()} -> ${randomIP()} (42.1 MB)\n`;
+            result += `3. ${randomIP()} -> ${randomIP()} (31.8 MB)\n`;
+            
+            return result;
+        }
+        
+        // Generate MD5 decryption results
+        function generateMd5DecryptResults() {
+            let result = "MD5 HASH DECRYPTION RESULTS:\n\n";
+            
+            const hashes = [
+                {hash: "5f4dcc3b5aa765d61d8327deb882cf99", plain: "password"},
+                {hash: "e10adc3949ba59abbe56e057f20f883e", plain: "123456"},
+                {hash: "25d55ad283aa400af464c76d713c07ad", plain: "12345678"},
+                {hash: "21232f297a57a5a743894a0e4a801fc3", plain: "admin"},
+                {hash: "5ebe2294ecd0e0f08eab7690d2a6ee69", plain: "secret"},
+                {hash: "d8578edf8458ce06fbc5bb76a58c5ca4", plain: "qwerty"},
+                {hash: "f30aa7a662c728b7407c54ae6bfd27d1", plain: "summer2023"},
+            ];
+            
+            for (const hash of hashes) {
+                result += `HASH: ${hash.hash}\n`;
+                result += `PLAINTEXT: ${hash.plain}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate SHA decryption results
+        function generateShaDecryptResults() {
+            let result = "SHA HASH DECRYPTION RESULTS:\n\n";
+            
+            const hashes = [
+                {hash: "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3", type: "SHA-1", plain: "test"},
+                {hash: "d033e22ae348aeb5660fc2140aec35850c4da997", type: "SHA-1", plain: "admin"},
+                {hash: "b03ddf3ca2e714a6548e7495e2a03f5e824eaac9", type: "SHA-1", plain: "raspberry"},
+                {hash: "e38ad214943daad1d64c102faec29de4afe9da3d", type: "SHA-1", plain: "password123"},
+                {hash: "8A798890FE93817163B10B5F7BD2CABF4474FDAA", type: "SHA-1", plain: "abcdef"},
+                {hash: "EC30FDC8E2D29CCAFC80FC3AC32956C3", type: "SHA-128", plain: "securepass"},
+            ];
+            
+            for (const hash of hashes) {
+                result += `HASH: ${hash.hash}\n`;
+                result += `TYPE: ${hash.type}\n`;
+                result += `PLAINTEXT: ${hash.plain}\n\n`;
+            }
+            
+            return result;
+        }
+        
+        // Generate RSA decryption results
+        function generateRsaDecryptResults() {
+            let result = "RSA DECRYPTION RESULTS:\n\n";
+            
+            result += "RSA KEY INFORMATION:\n";
+            result += "KEY SIZE: 2048 bits\n";
+            result += "PUBLIC EXPONENT: 65537\n";
+            result += "PRIVATE EXPONENT RECOVERED: YES\n\n";
+            
+            result += "PRIVATE KEY (PARTIAL):\n";
+            result += "-----BEGIN RSA PRIVATE KEY-----\n";
+            result += "MIIEpAIBAAKCAQEA1SXxVBN9JalK2MBn6QUcuZQNv7GFtfBmf82M0h46cJo5TWZr\n";
+            result += "pZ3APLVRnfyJ7jLhVzRLa/Pnw2ye+C+vMaPLXqE/r8sWG8AKpjnYJMuD3D255YfE\n";
+            result += "[... TRUNCATED ...]\n";
+            result += "-----END RSA PRIVATE KEY-----\n\n";
+            
+            result += "DECRYPTED MESSAGES:\n";
+            result += "1. \"Transfer $50,000 to account #2187654 on 10/15/2023\"\n";
+            result += "2. \"Password for backup server: K4j8Tp3xQ@7z\"\n";
+            result += "3. \"API key for production: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\"\n";
+            
+            return result;
+        }
+        
+        // Generate AES decryption results
+        function generateAesDecryptResults() {
+            let result = "AES DECRYPTION RESULTS:\n\n";
+            
+            result += "ENCRYPTION DETAILS:\n";
+            result += "ALGORITHM: AES-256-CBC\n";
+            result += "KEY (HEX): " + randomHex(64) + "\n";
+            result += "IV (HEX): " + randomHex(32) + "\n\n";
+            
+            result += "DECRYPTED DATA:\n\n";
+            result += "FILE 1: credentials.enc\n";
+            result += "CONTENT:\n";
+            result += "{\n";
+            result += '  "api_key": "9e7a24c08e9bfc3b7280393353bd3c74",\n';
+            result += '  "api_secret": "5db7aad7e8c8d6fcb9deea9e495aa5d8ec157a3b",\n';
+            result += '  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY",\n';
+            result += '  "refresh_token": "fdb8fdbecbf84b18b5d5c149885ac61f"\n';
+            result += "}\n\n";
+            
+            result += "FILE 2: message.enc\n";
+            result += "CONTENT:\n";
+            result += "Meeting changed to 3 PM tomorrow at the usual place. Bring the documents we discussed.\n\n";
+            
+            result += "FILE 3: coordinates.enc\n";
+            result += "CONTENT:\n";
+            result += "37.7749° N, 122.4194° W\n";
+            
+            return result;
+        }
+        
+        // Generate generic decryption results
+        function generateGenericDecryptResults() {
+            let result = "DECRYPTION RESULTS:\n\n";
+            
+            result += "ALGORITHM ANALYZED: Proprietary\n";
+            result += "KEY LENGTH: 256 bits\n";
+            result += "WEAKNESS FOUND: Predictable key generation\n\n";
+            
+            result += "DECRYPTED DATA SAMPLES:\n\n";
+            result += "SAMPLE 1:\n";
+            result += "Original (hex): " + randomHex(40) + "\n";
+            result += "Decrypted: User authentication token for admin@company.com\n\n";
+            
+            result += "SAMPLE 2:\n";
+            result += "Original (hex): " + randomHex(40) + "\n";
+            result += "Decrypted: API key: sk_test_TZ3axZWDCKUBWe1lz5GDCr2f\n\n";
+            
+            result += "SAMPLE 3:\n";
+            result += "Original (hex): " + randomHex(40) + "\n";
+            result += "Decrypted: SSH private key password: r9Z#bP$4kTvX\n";
+            
+            return result;
+        }
+        
+        // Generate CCTV access results
+        function generateCctvAccessResults() {
+            let result = "CCTV SYSTEM ACCESS:\n\n";
+            
+            result += "SYSTEM: Hikvision Control Center v4.32\n";
+            result += "CONNECTION: RTSP over TCP\n";
+            result += "STREAMS AVAILABLE: 24\n\n";
+            
+            result += "CAMERA LIST:\n";
+            
+            const cameras = [
+                {id: "CAM01", location: "Main Entrance", status: "ACTIVE", resolution: "1080p"},
+                {id: "CAM02", location: "Rear Door", status: "ACTIVE", resolution: "1080p"},
+                {id: "CAM03", location: "Parking Lot", status: "ACTIVE", resolution: "1080p"},
+                {id: "CAM04", location: "Server Room", status: "ACTIVE", resolution: "1080p"},
+                {id: "CAM05", location: "Hallway 1", status: "ACTIVE", resolution: "720p"},
+                {id: "CAM06", location: "Hallway 2", status: "INACTIVE", resolution: "720p"},
+                {id: "CAM07", location: "Reception", status: "ACTIVE", resolution: "1080p"},
+                {id: "CAM08", location: "Executive Office", status: "ACTIVE", resolution: "1080p"},
+            ];
+            
+            for (const camera of cameras) {
+                result += `ID: ${camera.id}\n`;
+                result += `LOCATION: ${camera.location}\n`;
+                result += `STATUS: ${camera.status}\n`;
+                result += `RESOLUTION: ${camera.resolution}\n`;
+                result += `STREAM URL: rtsp://${randomIP()}:554/cam/${camera.id.toLowerCase()}\n\n`;
+            }
+            
+                        result += "CONTROL CAPABILITIES:\n";
+            result += "- PTZ (Pan/Tilt/Zoom): Available on CAM01, CAM07, CAM08\n";
+            result += "- Recording Control: Available on all cameras\n";
+            result += "- Motion Detection Settings: Configurable\n";
+            result += "- Export Footage: Available (MP4, AVI formats)\n";
+            
+            return result;
+        }
+        
+        // Generate database access results
+        function generateDatabaseAccessResults() {
+            let result = "DATABASE SERVER ACCESS:\n\n";
+            
+            result += "SERVER: MySQL 8.0.28\n";
+            result += `HOST: ${randomIP()}\n`;
+            result += "PORT: 3306\n";
+            result += "USER: admin\n";
+            result += "PASSWORD: Db@dm1n2023\n\n";
+            
+            result += "AVAILABLE DATABASES:\n";
+            
+            const databases = [
+                {name: "customer_data", tables: 24, records: "1.2M", size: "4.8 GB"},
+                {name: "financial", tables: 15, records: "450K", size: "2.1 GB"},
+                {name: "inventory", tables: 8, records: "75K", size: "800 MB"},
+                {name: "employees", tables: 12, records: "5K", size: "350 MB"},
+                {name: "logs", tables: 6, records: "12M", size: "15 GB"},
+            ];
+            
+            for (const db of databases) {
+                result += `NAME: ${db.name}\n`;
+                result += `TABLES: ${db.tables}\n`;
+                result += `RECORDS: ~${db.records}\n`;
+                result += `SIZE: ${db.size}\n\n`;
+            }
+            
+            result += "SAMPLE QUERIES:\n";
+            result += "- SELECT * FROM customer_data.users LIMIT 10;\n";
+            result += "- SELECT COUNT(*) FROM financial.transactions WHERE amount > 10000;\n";
+            result += "- SHOW TABLES FROM employees;\n";
+            
+            return result;
+        }
+        
+        // Generate government access results
+        function generateGovernmentAccessResults() {
+            let result = "GOVERNMENT SYSTEM ACCESS:\n\n";
+            
+            result += "SYSTEM: Department of Records\n";
+            result += "ACCESS LEVEL: Limited Administrative\n";
+            result += "SESSION ENCRYPTION: TLS 1.3\n\n";
+            
+            result += "AVAILABLE MODULES:\n";
+            
+            const modules = [
+                {name: "Citizen Records", access: "READ", records: "143M"},
+                {name: "Vehicle Registration", access: "READ", records: "89M"},
+                {name: "Property Database", access: "READ", records: "65M"},
+                {name: "Tax Records", access: "READ-LIMITED", records: "112M"},
+                {name: "Licensing System", access: "READ", records: "27M"},
+            ];
+            
+            for (const module of modules) {
+                result += `MODULE: ${module.name}\n`;
+                result += `ACCESS LEVEL: ${module.access}\n`;
+                result += `RECORDS: ~${module.records}\n\n`;
+            }
+            
+            result += "SEARCH CAPABILITIES:\n";
+            result += "- Search by SSN\n";
+            result += "- Search by Name + DOB\n";
+            result += "- Search by Address\n";
+            result += "- Search by License Number\n\n";
+            
+            result += "ACTIVE SESSIONS: 1,432\n";
+            result += "SERVER LOCATION: Data Center 7, Washington DC\n";
+            
+            return result;
+        }
+        
+        // Generate financial access results
+        function generateFinancialAccessResults() {
+            let result = "FINANCIAL SYSTEM ACCESS:\n\n";
+            
+            result += "SYSTEM: Banking Core Infrastructure\n";
+            result += "INSTITUTION: Transcontinental Bank\n";
+            result += "ACCESS LEVEL: Transaction Monitoring\n\n";
+            
+            result += "AVAILABLE MODULES:\n";
+            
+            const modules = [
+                {name: "Account Summary", access: "READ", transactions: "24K/min"},
+                {name: "Transaction History", access: "READ", transactions: "120K/min"},
+                {name: "Fraud Detection", access: "READ", transactions: "5K alerts/day"},
+                {name: "Wire Transfers", access: "MONITOR", transactions: "3K/day"},
+                {name: "Customer Database", access: "READ-LIMITED", transactions: "10M records"},
+            ];
+            
+            for (const module of modules) {
+                result += `MODULE: ${module.name}\n`;
+                result += `ACCESS LEVEL: ${module.access}\n`;
+                result += `VOLUME: ~${module.transactions}\n\n`;
+            }
+            
+            result += "REAL-TIME TRANSACTION FEED:\n";
+            result += "- ACC#****4582: -$452.17 (POS Purchase) @ Walmart\n";
+            result += "- ACC#****7891: +$3,500.00 (Direct Deposit) from ACME Corp\n";
+            result += "- ACC#****3214: -$1,200.00 (Wire Transfer) to ACC#****9876\n";
+            result += "- ACC#****6543: -$82.95 (Online Payment) to Netflix\n\n";
+            
+            result += "SYSTEM LOAD: 78%\n";
+            result += "SECURITY ALERTS: 14 active\n";
+            
+            return result;
+        }
+        
+        // Generate generic access results
+        function generateGenericAccessResults() {
+            let result = "SYSTEM ACCESS GRANTED:\n\n";
+            
+            result += `HOST: ${randomIP()}\n`;
+            result += "OS: CentOS 7.9\n";
+            result += "KERNEL: 3.10.0-1160.71.1.el7.x86_64\n";
+            result += "UPTIME: 342 days, 7 hours\n\n";
+            
+            result += "SYSTEM RESOURCES:\n";
+            result += "CPU USAGE: 47%\n";
+            result += "MEMORY: 11.4 GB / 32 GB\n";
+            result += "DISK: 237.5 GB / 2 TB\n";
+            result += "NETWORK: 147 Mbps in / 68 Mbps out\n\n";
+            
+            result += "ACCESS LEVEL: Administrative\n";
+            result += "USER: sysadmin (uid=0)\n";
+            result += "GROUPS: root, wheel, sudo\n\n";
+            
+            result += "RUNNING SERVICES:\n";
+            result += "- nginx (PID: 1423)\n";
+            result += "- mysql (PID: 1892)\n";
+            result += "- ssh (PID: 1024)\n";
+            result += "- docker (PID: 2341)\n";
+            result += "- custom-app (PID: 3421)\n";
+            
+            return result;
+        }
+    </script>
+</body>
+</html>
